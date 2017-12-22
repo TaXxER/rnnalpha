@@ -20,7 +20,7 @@ import os
 import copy
 import csv
 
-csvfile = open('../data/env_permit.csv', 'r')
+csvfile = open('data/env_permit.csv', 'r')
 spamreader = csv.reader(csvfile, delimiter=',', quotechar='|')
 next(spamreader, None)  # skip the headers
 lastcase = ''
@@ -122,12 +122,12 @@ model = Sequential()
 #model.add(BatchNormalization(axis=1))
 model.add(LSTM(100, consume_less='gpu', init='glorot_uniform', return_sequences=True, W_regularizer=WeightRegularizer(l2=0.0005, l1=0.0001), input_shape=(maxlen, num_features)))
 model.add(BatchNormalization(axis=1))
-model.add(LSTM(100, consume_less='gpu', init='glorot_uniform', return_sequences=True, W_regularizer=WeightRegularizer(l2=0.0005, l1=0.0001), input_shape=(maxlen, num_features)))
-model.add(BatchNormalization(axis=1))
-model.add(LSTM(100, consume_less='gpu', init='glorot_uniform', return_sequences=True, W_regularizer=WeightRegularizer(l2=0.0005, l1=0.0001), input_shape=(maxlen, num_features)))
-model.add(BatchNormalization(axis=1))
-model.add(LSTM(100, consume_less='gpu', init='glorot_uniform', return_sequences=False, W_regularizer=WeightRegularizer(l2=0.0005, l1=0.0001), input_shape=(maxlen, num_features)))
-model.add(BatchNormalization(axis=1))
+#model.add(LSTM(100, consume_less='gpu', init='glorot_uniform', return_sequences=True, W_regularizer=WeightRegularizer(l2=0.0005, l1=0.0001), input_shape=(maxlen, num_features)))
+#model.add(BatchNormalization(axis=1))
+#model.add(LSTM(100, consume_less='gpu', init='glorot_uniform', return_sequences=True, W_regularizer=WeightRegularizer(l2=0.0005, l1=0.0001), input_shape=(maxlen, num_features)))
+#model.add(BatchNormalization(axis=1))
+#model.add(LSTM(100, consume_less='gpu', init='glorot_uniform', return_sequences=False, W_regularizer=WeightRegularizer(l2=0.0005, l1=0.0001), input_shape=(maxlen, num_features)))
+#model.add(BatchNormalization(axis=1))
 #model.add(LSTM(100, consume_less='gpu', init='glorot_uniform', return_sequences=False, W_regularizer=WeightRegularizer(l1=0.00005), input_shape=(maxlen, num_features)))
 #model.add(Dense(len(target_chars), activation='relu', init='glorot_uniform', W_regularizer=l1))
 model.add(Dense(len(target_chars), activation='softmax', init='glorot_uniform'))
