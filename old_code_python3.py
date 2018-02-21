@@ -3,12 +3,12 @@ It is recommended to run this script on GPU, as recurrent
 networks are quite computationally intensive.
 '''
 
-from __future__ import print_function, division
+
 from keras.models import Sequential
 from keras.layers.core import Dense
 from keras.layers.recurrent import LSTM
 from keras.utils.data_utils import get_file
-from keras.regularizers import WeightRegularizer
+from keras import regularizers
 from keras.optimizers import Nadam
 from keras.callbacks import EarlyStopping, ModelCheckpoint, ReduceLROnPlateau
 from keras.layers.normalization import BatchNormalization
@@ -34,29 +34,29 @@ for row in spamreader:
         lines.append(line)
         line = ''
         numlines+=1
-    line+=unichr(int(row[1])+ascii_offset )
+    line+=chr(int(row[1])+ascii_offset )
 
 random.shuffle(lines)
 
 
 elems_per_fold = int(round(numlines/3))
 fold1 = lines[:elems_per_fold]
-with open('output_files/folds/fold1.csv', 'wb') as csvfile:
+with open('output_files/folds/fold1.csv', 'w') as csvfile:
     spamwriter = csv.writer(csvfile, delimiter=',', quotechar='|', quoting=csv.QUOTE_MINIMAL)
     for row in fold1:
-        spamwriter.writerow([unicode(s).encode("utf-8") for s in row])
+        spamwriter.writerow([str(s).encode("utf-8") for s in row])
 
 fold2 = lines[elems_per_fold:2*elems_per_fold]
-with open('output_files/folds/fold2.csv', 'wb') as csvfile:
+with open('output_files/folds/fold2.csv', 'w') as csvfile:
     spamwriter = csv.writer(csvfile, delimiter=',', quotechar='|', quoting=csv.QUOTE_MINIMAL)
     for row in fold2:
-        spamwriter.writerow([unicode(s).encode("utf-8") for s in row])
+        spamwriter.writerow([str(s).encode("utf-8") for s in row])
         
 fold3 = lines[2*elems_per_fold:]
-with open('output_files/folds/fold3.csv', 'wb') as csvfile:
+with open('output_files/folds/fold3.csv', 'w') as csvfile:
     spamwriter = csv.writer(csvfile, delimiter=',', quotechar='|', quoting=csv.QUOTE_MINIMAL)
     for row in fold3:
-        spamwriter.writerow([unicode(s).encode("utf-8") for s in row])
+        spamwriter.writerow([str(s).encode("utf-8") for s in row])
 
 lines = fold1 + fold2
 
@@ -71,10 +71,10 @@ softness = 0
 next_chars = []
 #lines = text.splitlines()
 #lines = map(lambda x: '{'+x+'}',lines)
-lines = map(lambda x: x+'!',lines)
-maxlen = max(map(lambda x: len(x),lines))
+lines = [x+'!' for x in lines]
+maxlen = max([len(x) for x in lines])
 
-chars = map(lambda x : set(x),lines)
+chars = [set(x) for x in lines]
 chars = list(set().union(*chars))
 chars.sort()
 target_chars = copy.copy(chars)
@@ -84,7 +84,7 @@ char_indices = dict((c, i) for i, c in enumerate(target_chars))
 #char_indices['{'] = len(target_chars)
 indices_char = dict((i, c) for i, c in enumerate(target_chars))
 #indices_char[len(target_chars)] = '{'
-print(indices_char)
+#print(indices_char)
 
 for line in lines:
     for i in range(0, len(line), step):
@@ -120,7 +120,7 @@ print('Build model...')
 model = Sequential()
 #model.add(LSTM(1000, consume_less='gpu', init='glorot_uniform', return_sequences=True, dropout_W=0.4, input_shape=(maxlen, num_features)))
 #model.add(BatchNormalization(axis=1))
-model.add(LSTM(100, consume_less='gpu', init='glorot_uniform', return_sequences=False, W_regularizer=WeightRegularizer(l2=0.0005, l1=0.0001), input_shape=(maxlen, num_features)))
+model.add(LSTM(100, kernel_initializer='glorot_uniform', return_sequences=False, kernel_regularizer=regularizers.l1_l2(0.0001,0.0005), recurrent_regularizer=regularizers.l1_l2(0.0001,0.0005), input_shape=(maxlen, num_features)))
 model.add(BatchNormalization(axis=1))
 #model.add(LSTM(100, consume_less='gpu', init='glorot_uniform', return_sequences=True, W_regularizer=WeightRegularizer(l2=0.0005, l1=0.0001), input_shape=(maxlen, num_features)))
 #model.add(BatchNormalization(axis=1))
@@ -130,7 +130,7 @@ model.add(BatchNormalization(axis=1))
 #model.add(BatchNormalization(axis=1))
 #model.add(LSTM(100, consume_less='gpu', init='glorot_uniform', return_sequences=False, W_regularizer=WeightRegularizer(l1=0.00005), input_shape=(maxlen, num_features)))
 #model.add(Dense(len(target_chars), activation='relu', init='glorot_uniform', W_regularizer=l1))
-model.add(Dense(len(target_chars), activation='softmax', init='glorot_uniform'))
+model.add(Dense(len(target_chars), activation='softmax', kernel_initializer='glorot_uniform'))
 
 opt = Nadam(lr=0.0002, beta_1=0.9, beta_2=0.999, epsilon=1e-08, schedule_decay=0.004, clipvalue=2)
 
@@ -140,4 +140,4 @@ model_checkpoint = ModelCheckpoint('output_files/models/model_{epoch:02d}-{val_l
 lr_reducer = ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=10, verbose=0, mode='auto', epsilon=0.0001, cooldown=0, min_lr=0)
 
 # train the model, output generated text after each iteration
-model.fit(X, y, validation_split=0.2, callbacks=[early_stopping, model_checkpoint, lr_reducer], batch_size=maxlen, nb_epoch=500)
+model.fit(X, y, validation_split=0.2, callbacks=[early_stopping, model_checkpoint, lr_reducer], batch_size=maxlen, epochs=500)
