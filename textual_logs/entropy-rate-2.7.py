@@ -11,7 +11,7 @@ def read(file_path):
         return [chomp(line) for line in file]
 		
 def chars(lines):
-	return tokenize(lines, lambda s: s + " ")
+	return tokenize(lines, lambda s: s + "")
 	
 def words(lines):
 	return tokenize(lines, lambda s: re.findall(r"[a-zA-Z']+", s))
@@ -39,21 +39,25 @@ def total_brier_score(model, stats):
     #print(sum(brier_score(model[prefix], stats[prefix]) for prefix in stats))
     #print(math.pow(sum(stats.values()),2))
     #print()
-    return math.sqrt(sum(brier_score(model[prefix], stats[prefix]) for prefix in stats) / math.pow(sum(stats.values()), 2))
+    return math.sqrt(sum(brier_score(model[prefix], stats[prefix]) for prefix in stats) / sum(stats.values()) * math.pow(len(set.union(*[set(x) for x in set(stats.keys())])),2))
 
 def total_brier_score2(model, testmodel, stats):
     #print(sum(brier_score(model[prefix], stats[prefix]) for prefix in stats))
     #print(math.pow(sum(stats.values()),2))
     #print()
-    return math.sqrt(sum(brier_score2(model, testmodel, stats, prefix) for prefix in stats) / math.pow(sum(stats.values()), 2))
+    #print(len(set.union(*[set(x) for x in set(stats.keys())])))
+    # number of activities = len(set.union(*[set(x) for x in set(stats.keys())])) 
+    return math.sqrt(sum(brier_score2(model, testmodel, stats, prefix) for prefix in stats) / (sum(stats.values()) * math.pow(len(set.union(*[set(x) for x in set(stats.keys())])),2) ))
 
 
 def brier_score2(model, testmodel, stats, prefix):
     normalization_factor = stats[prefix]
+    #print('total times prefix seen: {}'.format(normalization_factor))
+    actual = testmodel[prefix]
+    o_prefix = prefix
     while prefix not in model:
         prefix = prefix[:-1]
     probas = model[prefix]
-    actual = testmodel[prefix]
     #print(probas)
     #print()
     normalization_factor2 = sum(probas.values())
@@ -62,20 +66,26 @@ def brier_score2(model, testmodel, stats, prefix):
     #print()
  
     brier = 0
-    for i, count in probas.items(): # predicted probabilities
-        proba = count/normalization_factor2
+    for i, count in actual.items(): # predicted probabilities
         #print(i)
         #print(proba)
         #print(normalization_factor)
         #print(probas.values())
         #print()
-        
-        for j, count2 in actual.items(): # true probabilities
+        for j, count2 in probas.items(): # true probabilities
+            proba = count2/normalization_factor2
+            #print('true: {}, {} times, predicted: {}, with probability: {}'.format(i,count,j,proba))
             if i==j:
                 #print('i!: {}'.format(i))
-                brier += count2 * math.pow(1-(proba/normalization_factor),2)
+                brier += count * math.pow(1-(proba),2)
+                #print(count * math.pow(1-(proba),2))
             else:
-                brier += count2 * math.pow(0-(proba/normalization_factor),2)
+                brier += count * math.pow(0-(proba),2)
+                #print(count * math.pow(0-(proba),2))
+        #print('brier for prefix {} followed by {}: {}'.format(o_prefix, i, brier))
+        #print()
+    #print('total brier for prefix {}: {}'.format(o_prefix, brier))
+    #print()
     return brier
 
 def brier_score(stats, normalization_factor):
@@ -100,14 +110,14 @@ def chomp(x):
     if x.endswith("\n"): return x[:-1]
     return x
 
-all_lines = read("receipt_phase.txt")
+all_lines = read("sepsis.txt")
 random.shuffle(all_lines)
 elems_per_fold = int(round(len(all_lines)/3))
 train = all_lines[:2*elems_per_fold]
 test = all_lines[2*elems_per_fold:]
 
 for i in range(1,10):
-    model, stats = markov_model(chars(train), i)
+    model, stats = markov_model(train, i)
     print("Order: {}, Entropy rate: {}".format(i,entropy_rate(model, stats)))
     
 for i in range(1,10):
