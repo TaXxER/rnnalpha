@@ -86,7 +86,7 @@ hmm_modified <- function (y, yval = NULL, par0 = NULL, K = NULL, rand.start = NU
         if (verbose) 
             cat(paste("EM step ", em.step, ":\n", sep = ""))
         tpm <- revise.tpm(rp$xi, mixture)
-        tpm[is.na(tpm)] <- 0
+        tpm[is.na(tpm)] <- 0 # <-- added line 
         ispd <- if (stationary) {
             revise.ispd(tpm)
         }
@@ -94,8 +94,8 @@ hmm_modified <- function (y, yval = NULL, par0 = NULL, K = NULL, rand.start = NU
             revise.ispd(gamma = rp$gamma, lns = lns, cis = cis)
         }
         Rho <- revise.rho(y, rp$gamma, rnms)
-        Rho[is.na(Rho)] <- 0
-        ispd[is.na(ispd)] <- 0
+        Rho[is.na(Rho)] <- 0 # <-- added line 
+        ispd[is.na(ispd)] <- 0 # <-- added line 
         fy <- ffun(y, Rho)
         rp <- recurse(fy, tpm, ispd, lns)
         ll <- sum(log(rp$llc))
