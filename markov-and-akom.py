@@ -1,5 +1,7 @@
 import re, codecs, random, math, textwrap
 from collections import defaultdict, deque, Counter
+import operator
+
 
 def tokenize(lines, tokenizer):
 	for line in lines:
@@ -67,13 +69,41 @@ def generate(model, state, length):
 		yield state[0]
 		state = state[1:] + (pick(model[state]), ) 
 
-all_lines = read("bpi_12.txt")
-random.shuffle(all_lines)
-elems_per_fold = int(round(len(all_lines)/3))
-train = all_lines[:2*elems_per_fold]
-test = all_lines[2*elems_per_fold:]
 
-for i in range(1,20):
-    model, stats = markov_model(chars(train), i)
-    model_test, stats_test = markov_model(chars(test), i)
-    print("Order: {}, Brier score: {}".format(i,total_brier_score(model, model_test, stats_test)))
+# for reproducibility
+random.seed(22)
+
+all_lines = read("textual_logs/sepsis.txt")
+
+all_brier_scores = []
+for i in range(3):
+    random.shuffle(all_lines)
+    elems_per_fold = int(round(len(all_lines)/3))
+    train = all_lines[:2*elems_per_fold]
+    test = all_lines[2*elems_per_fold:]
+
+    # model selection
+    random.shuffle(train)
+    n_val_traces = int(round(len(train) * 0.2))
+    val_selection = train[:n_val_traces]
+    train_selection = train[n_val_traces:]
+
+    brier_scores_all_orders = {}
+    for order in range(1,20):
+        model, stats = markov_model(chars(train_selection), order)
+        model_test, stats_test = markov_model(chars(val_selection), order)
+        score_current_order = total_brier_score(model, model_test, stats_test)
+        brier_scores_all_orders[order] = score_current_order
+        print("[Validation] Order: {}, Brier score: {}".format(order, score_current_order))
+
+    # train and evaluate final model
+    best_order = min(brier_scores_all_orders.items(), key=operator.itemgetter(1))[0]
+    model, stats = markov_model(chars(train), best_order)
+    model_test, stats_test = markov_model(chars(test), best_order)
+    final_brier_score = total_brier_score(model, model_test, stats_test)
+    print("[Test] Order: {}, Brier score: {}".format(best_order, final_brier_score))
+    print()
+    
+    all_brier_scores.append(final_brier_score)
+    
+print("Brier scores: ", all_brier_scores)
