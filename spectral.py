@@ -6,7 +6,7 @@ import numpy as np
 
 X = load_data_sample('spice_logs/sepsis.spice')
 
-X_train, X_test = train_test_split(X.data, test_size=0.33)
+X_train, X_test = train_test_split(X.data, test_size=(1/3))
 # build the model: 
 print('Build model...')
 model = Spectral(full_svd_calculation=True)
@@ -48,4 +48,5 @@ for test_seq in X_test:
         prefix += [elem-1]
         if elem == -1: # stop making predictions for this sequence after end symbol is observed 
             break
+print(len(brier_scores))
 print(np.sum(brier_scores)/len(brier_scores))
