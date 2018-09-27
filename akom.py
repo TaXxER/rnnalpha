@@ -1,6 +1,7 @@
 import re, codecs, random, math, textwrap
 from collections import defaultdict, deque, Counter
 import operator
+from sys import argv
 
 
 def tokenize(lines, tokenizer):
@@ -73,7 +74,7 @@ def generate(model, state, length):
 # for reproducibility
 random.seed(22)
 
-all_lines = read("textual_logs/sepsis.txt")
+all_lines = read(argv[1])
 
 all_brier_scores = []
 for i in range(3):
@@ -94,14 +95,14 @@ for i in range(3):
         model_test, stats_test = markov_model(chars(val_selection), order)
         score_current_order = total_brier_score(model, model_test, stats_test)
         brier_scores_all_orders[order] = score_current_order
-        print("[Validation] Order: {}, Brier score: {}".format(order, score_current_order))
+        print("[Validation] Iter: {}, Order: {}, Brier score: {}".format(i, order, score_current_order))
 
     # train and evaluate final model
     best_order = min(brier_scores_all_orders.items(), key=operator.itemgetter(1))[0]
     model, stats = markov_model(chars(train), best_order)
     model_test, stats_test = markov_model(chars(test), best_order)
     final_brier_score = total_brier_score(model, model_test, stats_test)
-    print("[Test] Order: {}, Brier score: {}".format(best_order, final_brier_score))
+    print("[Test] Iter: {}, Order: {}, Brier score: {}".format(i, best_order, final_brier_score))
     print()
     
     all_brier_scores.append(final_brier_score)
