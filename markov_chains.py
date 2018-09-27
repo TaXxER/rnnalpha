@@ -14,7 +14,7 @@ def read(file_path):
         return [chomp(line) for line in file]
 		
 def chars(lines):
-	return tokenize(lines, lambda s: ' ' + s)
+	return tokenize(lines, lambda s: s + ' ')
 	
 def markov_model(stream, model_order):
 	model, stats = defaultdict(Counter), Counter()
@@ -25,15 +25,18 @@ def markov_model(stream, model_order):
 		if len(prefix) <= model_order:
 			model[prefix][token] += 1.0
 			stats[prefix] += 1.0
-		circular_buffer.append(token)
+		if token == ' ':
+			circular_buffer = deque(maxlen = model_order)
+		else:
+			circular_buffer.append(token)
 	return model, stats
 
 def total_brier_score(model, testmodel, stats):
-    return sum(brier_score(model, testmodel, stats, prefix) for prefix in stats) / (sum(stats.values()) * len(set.union(*[set(x) for x in set(stats.keys())]))-1) # -1 for the ' '-character
+    return sum(brier_score(model, testmodel, stats, prefix) for prefix in stats) / (sum(stats.values()) * n_vocabulary)
 
-def brier_score(model, testmodel, stats, prefix):
-    if ' ' in prefix: # outcomment this if-statement for AKOM model
-        return stats[prefix]
+def brier_score(model, testmodel, teststats, prefix):
+    if prefix not in model.keys(): # outcomment this if-statement for AKOM model
+        return teststats[prefix]
     actual = testmodel[prefix]
     n_prefix = prefix
     while n_prefix not in model.keys():
@@ -43,8 +46,8 @@ def brier_score(model, testmodel, stats, prefix):
     if normalization_factor == 0:
         return 1
     brier = 0
-    for i, count in actual.items(): # predicted probabilities
-        for j, count2 in probas.items(): # true probabilities
+    for i, count in actual.items(): # true probabilities
+        for j, count2 in probas.items(): # predicted probabilities
             proba = count2/normalization_factor
             if i==j:
                 brier += count * math.pow(1-(proba),2)
@@ -75,6 +78,7 @@ def generate(model, state, length):
 random.seed(22)
 
 all_lines = read(argv[1])
+n_vocabulary = len(set([c for seq in all_lines for c in seq])) + 1 # +1 is for the end symbol
 
 for order in range(1,3):
     all_brier_scores = []
