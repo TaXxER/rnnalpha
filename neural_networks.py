@@ -135,7 +135,7 @@ def get_model(params):
 
 def train_and_evaluate_model(params):
     model = get_model(params)
-    early_stopping = EarlyStopping(monitor='val_loss', patience=early_stopping_patience, restore_best_weights=True)
+    early_stopping = EarlyStopping(monitor='val_loss', patience=early_stopping_patience)#, restore_best_weights=True)
     lr_reducer = ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=100, verbose=0, mode='auto', epsilon=0.0001, cooldown=0, min_lr=0)
 
     # train the model, output generated text after each iteration
@@ -146,6 +146,7 @@ def train_and_evaluate_model(params):
     
     scores = [history.history['val_loss'][epoch] for epoch in range(len(history.history['loss']))]
     score = min(scores)
+    print(score)
     global best_score, best_model
     if best_score > score:
         best_score = score
@@ -189,7 +190,7 @@ for _ in range(3):
     
     # model selection
     print('Starting model selection...')
-    best_score = 1
+    best_score = np.inf
     best_model = None
     trials = Trials()
     best = fmin(train_and_evaluate_model, space, algo=tpe.suggest, max_evals=n_iter, trials=trials)
