@@ -110,5 +110,16 @@ for i in range(3):
     print()
     
     all_brier_scores.append(final_brier_score)
+
+if "sepsis" in argv[1]:
+    dataset = "Sepsis"
+elif "bpi" in argv[1]:
+    dataset = "BPI12"
+elif "receipt" in argv[1]:
+    dataset = "WABO receipt phase"
+else:
+    dataset = argv[1]
     
-print("Brier scores: ", all_brier_scores)
+for score in all_brier_scores:
+    print("%s,AKOM,,%s," % (dataset, score))
+    

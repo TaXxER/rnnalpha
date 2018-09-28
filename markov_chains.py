@@ -73,6 +73,14 @@ def generate(model, state, length):
 		yield state[0]
 		state = state[1:] + (pick(model[state]), ) 
 
+if "sepsis" in argv[1]:
+    dataset = "Sepsis"
+elif "bpi" in argv[1]:
+    dataset = "BPI12"
+elif "receipt" in argv[1]:
+    dataset = "WABO receipt phase"
+else:
+    dataset = argv[1]
 
 # for reproducibility
 random.seed(22)
@@ -91,9 +99,9 @@ for order in range(1,3):
         model, stats = markov_model(chars(train), order)
         model_test, stats_test = markov_model(chars(test), order)
         final_brier_score = total_brier_score(model, model_test, stats_test)
-        print("[Test] Iter: {}, Order: {}, Brier score: {}".format(i, order, final_brier_score))
 
         all_brier_scores.append(final_brier_score)
     
-    print("Brier scores for order %s: " % order, all_brier_scores)
+    for score in all_brier_scores:
+        print("%s,Order-%s Markov,,%s," % (dataset, order, score))
     print()
