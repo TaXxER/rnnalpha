@@ -5,7 +5,7 @@ networks are quite computationally intensive.
 
 from keras.models import Sequential
 from keras.layers.core import Dense
-from keras.layers import LSTM, GRU, SimpleRNN
+from keras.layers import CuDNNLSTM, CuDNNGRU, SimpleRNN, Activation
 from keras import regularizers
 from keras.optimizers import Nadam, Adam
 from keras.callbacks import EarlyStopping, ModelCheckpoint, ReduceLROnPlateau
@@ -16,12 +16,17 @@ import random
 import sys
 import os
 from sys import argv
+import tensorflow as tf
+
 
 from hyperopt import Trials, STATUS_OK, tpe, fmin, hp
 import hyperopt
 from hyperopt.pyll.base import scope
 from hyperopt.pyll.stochastic import sample
 
+import keras
+print(keras.__version__)
+print(tf.__version__)
 
 filename = argv[1]
 model_type = argv[2]
@@ -31,7 +36,7 @@ with open(filename, "r") as fin:
         
 maxlen = max([len(x) for x in traces])
 nb_epochs = 125
-early_stopping_patience = 30
+early_stopping_patience = 10
 
 vocabulary = set([val for trace in traces for val in trace])
 vocabulary = {key: idx for idx, key in enumerate(vocabulary)}
@@ -65,69 +70,61 @@ def get_model(params):
     n_layers = int(params["n_layers"])
 
     if model_type == "LSTM":
-        model.add(LSTM(int(params["lstmsize"]),
-                               consume_less='gpu',
-                               init='glorot_uniform',
+        model.add(CuDNNLSTM(int(params["lstmsize"]),
+                               kernel_initializer='glorot_uniform',
                                return_sequences=(n_layers != 1),
                                kernel_regularizer=regularizers.l1_l2(params["l1"],params["l2"]),
                                recurrent_regularizer=regularizers.l1_l2(params["l1"],params["l2"]),
-                               dropout=params["dropout"],
+                               #dropout=params["dropout"],
                                input_shape=(maxlen, num_chars)))
 
 
         for i in range(2, n_layers+1):
             return_sequences = (i != n_layers)
-            model.add(LSTM(int(params["lstmsize"]),
-                           consume_less='gpu',
-                           init='glorot_uniform',
+            model.add(CuDNNLSTM(int(params["lstmsize"]),
+                           kernel_initializer='glorot_uniform',
                            return_sequences=return_sequences,
                            kernel_regularizer=regularizers.l1_l2(params["l1"],params["l2"]),
-                           recurrent_regularizer=regularizers.l1_l2(params["l1"],params["l2"]),
-                           dropout=params["dropout"]))
+                           recurrent_regularizer=regularizers.l1_l2(params["l1"],params["l2"])))
             
     elif model_type == "GRU":
-        model.add(GRU(int(params["lstmsize"]),
-                               consume_less='gpu',
-                               init='glorot_uniform',
+        model.add(CuDNNGRU(int(params["lstmsize"]),
+                               kernel_initializer='glorot_uniform',
                                return_sequences=(n_layers != 1),
                                kernel_regularizer=regularizers.l1_l2(params["l1"],params["l2"]),
                                recurrent_regularizer=regularizers.l1_l2(params["l1"],params["l2"]),
-                               dropout=params["dropout"],
+                               #dropout=params["dropout"],
                                input_shape=(maxlen, num_chars)))
 
 
         for i in range(2, n_layers+1):
             return_sequences = (i != n_layers)
-            model.add(GRU(int(params["lstmsize"]),
-                           consume_less='gpu',
-                           init='glorot_uniform',
+            model.add(CuDNNGRU(int(params["lstmsize"]),
+                           kernel_initializer='glorot_uniform',
                            return_sequences=return_sequences,
                            kernel_regularizer=regularizers.l1_l2(params["l1"],params["l2"]),
-                           recurrent_regularizer=regularizers.l1_l2(params["l1"],params["l2"]),
-                           dropout=params["dropout"]))
+                           recurrent_regularizer=regularizers.l1_l2(params["l1"],params["l2"])))
             
     elif model_type == "RNN":
         model.add(SimpleRNN(int(params["lstmsize"]),
-                               consume_less='gpu',
-                               init='glorot_uniform',
+                               kernel_initializer='glorot_uniform',
                                return_sequences=(n_layers != 1),
                                kernel_regularizer=regularizers.l1_l2(params["l1"],params["l2"]),
                                recurrent_regularizer=regularizers.l1_l2(params["l1"],params["l2"]),
-                               dropout=params["dropout"],
+                               #dropout=params["dropout"],
                                input_shape=(maxlen, num_chars)))
 
 
         for i in range(2, n_layers+1):
             return_sequences = (i != n_layers)
             model.add(SimpleRNN(int(params["lstmsize"]),
-                           consume_less='gpu',
-                           init='glorot_uniform',
+                           kernel_initializer='glorot_uniform',
                            return_sequences=return_sequences,
                            kernel_regularizer=regularizers.l1_l2(params["l1"],params["l2"]),
-                           recurrent_regularizer=regularizers.l1_l2(params["l1"],params["l2"]),
-                           dropout=params["dropout"]))
+                           recurrent_regularizer=regularizers.l1_l2(params["l1"],params["l2"])))
     
-    model.add(Dense(num_chars, activation='softmax', kernel_initializer='glorot_uniform'))
+    model.add(Dense(num_chars, kernel_initializer='glorot_uniform'))
+    model.add(Activation(tf.nn.softmax))
     opt = Adam(lr=params["learning_rate"])
     model.compile(loss='mean_squared_error', optimizer=opt)
 
@@ -157,14 +154,16 @@ def train_and_evaluate_model(params):
     
 random.seed(22) # for reproducibility
 
+
 space = {'lstmsize': scope.int(hp.loguniform('lstmsize', np.log(10), np.log(150))),
-         'dropout': hp.uniform("dropout", 0, 0.5),
+         #'dropout': hp.uniform("dropout", 0, 0.5),
          'l1': hp.loguniform("l1", 0, np.log(0.1)),
          'l2': hp.loguniform("l2", 0, np.log(0.1)),
          'batch_size': scope.int(hp.uniform('batch_size', 3, 6)),
          'learning_rate': hp.loguniform("learning_rate", np.log(0.00001), np.log(0.01)),
          'n_layers': hp.choice('n_layers', [1,2,3])
         }
+        
 n_iter = 30
 
 final_brier_scores = []
@@ -188,6 +187,7 @@ for _ in range(3):
     
     print(X_train.shape, y_train.shape, X_val.shape, y_val.shape)
     
+    
     # model selection
     print('Starting model selection...')
     best_score = np.inf
@@ -196,7 +196,15 @@ for _ in range(3):
     best = fmin(train_and_evaluate_model, space, algo=tpe.suggest, max_evals=n_iter, trials=trials)
     best_params = hyperopt.space_eval(space, best)
     print(best_params)
-
+    """
+    train_and_evaluate_model({'lstmsize': 10,
+         'l1': 0.01,
+         'l2': 0.01,
+         'batch_size': 16,
+         'learning_rate': 0.0001,
+         'n_layers': 1
+        })
+    """
     # vectorize datasets for final evaluation
     X_test, y_test = generate_vectorized_data(test)
     
