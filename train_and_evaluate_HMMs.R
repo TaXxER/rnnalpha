@@ -21,9 +21,9 @@ vocabulary <- unique(unlist(data))
 hmm_max_iter_val <- 10000
 hmm_max_iter_test <- 50000
 
-set.seed(22)
+set.seed(args[2])
 mean_brier_scores <- c()
-for (iter in 1:3) {
+for (iter in 1:1) {
   train_ids <- sample(1:length(data), round(2*length(data)/3))
   dt_train <- data[train_ids]
   dt_test <- data[-train_ids]
@@ -38,7 +38,7 @@ for (iter in 1:3) {
   best_reg <- NA
   best_brier_score <- Inf
   
-  for (states_ratio in c(0.1, 0.5, 1.0, 2.0, 5.0, 10.0)) {
+  for (states_ratio in c(0.1, 0.5, 1.0, 1.5, 2.0, 3.0, 5.0)) {
     n_hmm_states <- as.integer(states_ratio * length(vocabulary))
     
     for (reg in c("PCLL", "L2", "Linf")){
