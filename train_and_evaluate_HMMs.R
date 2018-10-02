@@ -1,16 +1,23 @@
-setwd("Repos/rnnalpha/")
+#!/usr/bin/env Rscript
+
+#setwd("rnnalpha/")
+
+if(!require(hmm.discnp)) install.packages("hmm.discnp",repos = "http://cran.us.r-project.org")
+if(!require(scoring)) install.packages("scoring",repos = "http://cran.us.r-project.org")
 
 library(hmm.discnp)
 library(scoring)
 
 # load the modified hmm function that is able to deal with empty states
-source('hmm_function_modified.R')
+#source('hmm_function_modified.R')
 
-data <- strsplit(scan("textual_logs/sepsis.txt", what="", sep="\n"), "")
+args = commandArgs(trailingOnly=TRUE)
+
+data <- strsplit(scan(sprintf("textual_logs/%s", args[1]), what="", sep="\n"), "")
 data <- sapply(data, function(x) c(x, "END"))
 vocabulary <- unique(unlist(data))
 
-hmm_max_iter_val <- 1000
+hmm_max_iter_val <- 10000
 hmm_max_iter_test <- 50000
 
 set.seed(22)
@@ -35,7 +42,8 @@ for (iter in 1:3) {
     
     for (reg in c("PCLL", "L2", "Linf")){
 
-      hmm_model <- hmm_modified(dt_train_selection, yval=vocabulary, K=n_hmm_states, crit=reg, itmax=hmm_max_iter_val)
+      #hmm_model <- hmm_modified(dt_train_selection, yval=vocabulary, K=n_hmm_states, crit=reg, itmax=hmm_max_iter_val)
+      hmm_model <- hmm(dt_train_selection, yval=vocabulary, K=n_hmm_states, crit=reg, itmax=hmm_max_iter_val)
       
       brier_scores <- c()
       for (trace in dt_val_selection) {
@@ -79,7 +87,8 @@ for (iter in 1:3) {
   
   ### START FINAL MODEL TRAINING AND EVALUATION ###
   n_hmm_states <- as.integer(best_states_ratio * length(vocabulary))
-  hmm_model <- hmm_modified(dt_train, yval=vocabulary, K=n_hmm_states, crit=best_reg, itmax=hmm_max_iter_test)
+  #hmm_model <- hmm_modified(dt_train, yval=vocabulary, K=n_hmm_states, crit=best_reg, itmax=hmm_max_iter_test)
+  hmm_model <- hmm(dt_train, yval=vocabulary, K=n_hmm_states, crit=best_reg, itmax=hmm_max_iter_test)
   
   brier_scores <- c()
   for (trace in dt_test) {
