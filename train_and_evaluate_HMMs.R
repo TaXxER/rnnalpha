@@ -14,7 +14,7 @@ source('hmm_function_modified_equal_probs.R')
 
 args = commandArgs(trailingOnly=TRUE)
 
-data <- strsplit(scan(sprintf("textual_logs/%s", "sepsis.txt"), what="", sep="\n"), "")
+data <- strsplit(scan(sprintf("textual_logs/%s", args[1]), what="", sep="\n"), "")
 data <- sapply(data, function(x) c(x, "END"))
 vocabulary <- unique(unlist(data))
 

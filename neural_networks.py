@@ -5,7 +5,7 @@ networks are quite computationally intensive.
 
 from keras.models import Sequential
 from keras.layers.core import Dense
-from keras.layers import CuDNNLSTM, CuDNNGRU, SimpleRNN, Activation
+from keras.layers import CuDNNLSTM, CuDNNGRU, SimpleRNN, Activation, Dropout
 from keras import regularizers
 from keras.optimizers import Nadam, Adam
 from keras.callbacks import EarlyStopping, ModelCheckpoint, ReduceLROnPlateau
@@ -67,7 +67,7 @@ def generate_vectorized_data(traces):
 def get_model(params):
     model = Sequential()
     
-    n_layers = int(params["n_layers"])
+    n_layers = int(params["n_layers"]["n_layers"])
 
     if model_type == "LSTM":
         model.add(CuDNNLSTM(int(params["lstmsize"]),
@@ -75,17 +75,18 @@ def get_model(params):
                                return_sequences=(n_layers != 1),
                                kernel_regularizer=regularizers.l1_l2(params["l1"],params["l2"]),
                                recurrent_regularizer=regularizers.l1_l2(params["l1"],params["l2"]),
-                               #dropout=params["dropout"],
                                input_shape=(maxlen, num_chars)))
+        model.add(Dropout(params["dropout"]))
 
 
         for i in range(2, n_layers+1):
             return_sequences = (i != n_layers)
-            model.add(CuDNNLSTM(int(params["lstmsize"]),
+            model.add(CuDNNLSTM(int(params["n_layers"]["lstmsize%s%s" % (n_layers, i)]),
                            kernel_initializer='glorot_uniform',
                            return_sequences=return_sequences,
                            kernel_regularizer=regularizers.l1_l2(params["l1"],params["l2"]),
                            recurrent_regularizer=regularizers.l1_l2(params["l1"],params["l2"])))
+            model.add(Dropout(params["dropout"]))
             
     elif model_type == "GRU":
         model.add(CuDNNGRU(int(params["lstmsize"]),
@@ -93,35 +94,36 @@ def get_model(params):
                                return_sequences=(n_layers != 1),
                                kernel_regularizer=regularizers.l1_l2(params["l1"],params["l2"]),
                                recurrent_regularizer=regularizers.l1_l2(params["l1"],params["l2"]),
-                               #dropout=params["dropout"],
                                input_shape=(maxlen, num_chars)))
+        model.add(Dropout(params["dropout"]))
 
 
         for i in range(2, n_layers+1):
             return_sequences = (i != n_layers)
-            model.add(CuDNNGRU(int(params["lstmsize"]),
+            model.add(CuDNNGRU(int(params["n_layers"]["lstmsize%s%s" % (n_layers, i)]),
                            kernel_initializer='glorot_uniform',
                            return_sequences=return_sequences,
                            kernel_regularizer=regularizers.l1_l2(params["l1"],params["l2"]),
                            recurrent_regularizer=regularizers.l1_l2(params["l1"],params["l2"])))
+            model.add(Dropout(params["dropout"]))
             
     elif model_type == "RNN":
         model.add(SimpleRNN(int(params["lstmsize"]),
                                kernel_initializer='glorot_uniform',
                                return_sequences=(n_layers != 1),
                                kernel_regularizer=regularizers.l1_l2(params["l1"],params["l2"]),
-                               recurrent_regularizer=regularizers.l1_l2(params["l1"],params["l2"]),
-                               #dropout=params["dropout"],
-                               input_shape=(maxlen, num_chars)))
+                               recurrent_regularizer=regularizers.l1_l2(params["l1"],params["l2"])))
+        model.add(Dropout(params["dropout"]))
 
 
         for i in range(2, n_layers+1):
             return_sequences = (i != n_layers)
-            model.add(SimpleRNN(int(params["lstmsize"]),
+            model.add(SimpleRNN(int(params["n_layers"]["lstmsize%s%s" % (n_layers, i)]),
                            kernel_initializer='glorot_uniform',
                            return_sequences=return_sequences,
                            kernel_regularizer=regularizers.l1_l2(params["l1"],params["l2"]),
                            recurrent_regularizer=regularizers.l1_l2(params["l1"],params["l2"])))
+            model.add(Dropout(params["dropout"]))
     
     model.add(Dense(num_chars, kernel_initializer='glorot_uniform'))
     model.add(Activation(tf.nn.softmax))
@@ -131,15 +133,16 @@ def get_model(params):
     return model
 
 def train_and_evaluate_model(params):
+    print(params)
     model = get_model(params)
-    early_stopping = EarlyStopping(monitor='val_loss', patience=early_stopping_patience)#, restore_best_weights=True)
+    early_stopping = EarlyStopping(monitor='val_loss', patience=early_stopping_patience, restore_best_weights=True)
     lr_reducer = ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=100, verbose=0, mode='auto', epsilon=0.0001, cooldown=0, min_lr=0)
 
     # train the model, output generated text after each iteration
     history = model.fit(X_train, y_train, 
               validation_data=(X_val, y_val),
               callbacks=[early_stopping, lr_reducer],
-              batch_size=2**params['batch_size'], epochs=nb_epochs)
+              batch_size=2**params['batch_size'], epochs=nb_epochs, verbose=2)
     
     scores = [history.history['val_loss'][epoch] for epoch in range(len(history.history['loss']))]
     score = min(scores)
@@ -156,15 +159,22 @@ random.seed(22) # for reproducibility
 
 
 space = {'lstmsize': scope.int(hp.loguniform('lstmsize', np.log(10), np.log(150))),
-         #'dropout': hp.uniform("dropout", 0, 0.5),
-         'l1': hp.loguniform("l1", 0, np.log(0.1)),
-         'l2': hp.loguniform("l2", 0, np.log(0.1)),
+         'dropout': hp.uniform("dropout", 0, 0.5),
+         'l1': hp.loguniform("l1", np.log(0.00001), np.log(0.1)),
+         'l2': hp.loguniform("l2", np.log(0.00001), np.log(0.1)),
          'batch_size': scope.int(hp.uniform('batch_size', 3, 6)),
          'learning_rate': hp.loguniform("learning_rate", np.log(0.00001), np.log(0.01)),
-         'n_layers': hp.choice('n_layers', [1,2,3])
+         'n_layers': hp.choice('n_layers', [
+             {'n_layers': 1},
+             {'n_layers': 2,
+              'lstmsize22': scope.int(hp.loguniform('lstmsize22', np.log(10), np.log(150)))},
+             {'n_layers': 3,
+              'lstmsize32': scope.int(hp.loguniform('lstmsize32', np.log(10), np.log(150))),
+              'lstmsize33': scope.int(hp.loguniform('lstmsize33', np.log(10), np.log(150)))}
+         ])
         }
         
-n_iter = 30
+n_iter = 60
 
 final_brier_scores = []
 for _ in range(3):
