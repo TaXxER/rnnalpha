@@ -35,8 +35,8 @@ with open(filename, "r") as fin:
     traces = [x.strip() + ' ' for x in fin]
         
 maxlen = max([len(x) for x in traces])
-nb_epochs = 125
-early_stopping_patience = 10
+nb_epochs = 200
+early_stopping_patience = 20
 
 vocabulary = set([val for trace in traces for val in trace])
 vocabulary = {key: idx for idx, key in enumerate(vocabulary)}
@@ -140,7 +140,7 @@ def train_and_evaluate_model(params):
 
     # train the model, output generated text after each iteration
     history = model.fit(X_train, y_train, 
-              validation_data=(X_val, y_val),
+              validation_split=0.2,
               callbacks=[early_stopping, lr_reducer],
               batch_size=2**params['batch_size'], epochs=nb_epochs, verbose=2)
     
@@ -185,18 +185,10 @@ for _ in range(3):
     train = traces[:2*elems_per_fold]
     test = traces[2*elems_per_fold:]
     
-    # split for model selection
-    random.shuffle(train)
-    n_val_traces = int(round(len(train) * 0.2))
-    val_selection = train[:n_val_traces]
-    train_selection = train[n_val_traces:]
-    
     # vectorize datasets for model selection
-    X_train, y_train = generate_vectorized_data(train_selection)
-    X_val, y_val = generate_vectorized_data(val_selection)
+    X_train, y_train = generate_vectorized_data(train)
     
-    print(X_train.shape, y_train.shape, X_val.shape, y_val.shape)
-    
+    print(X_train.shape, y_train.shape)
     
     # model selection
     print('Starting model selection...')
@@ -206,15 +198,7 @@ for _ in range(3):
     best = fmin(train_and_evaluate_model, space, algo=tpe.suggest, max_evals=n_iter, trials=trials)
     best_params = hyperopt.space_eval(space, best)
     print(best_params)
-    """
-    train_and_evaluate_model({'lstmsize': 10,
-         'l1': 0.01,
-         'l2': 0.01,
-         'batch_size': 16,
-         'learning_rate': 0.0001,
-         'n_layers': 1
-        })
-    """
+    
     # vectorize datasets for final evaluation
     X_test, y_test = generate_vectorized_data(test)
     
@@ -225,3 +209,5 @@ for _ in range(3):
     
     print(brier_score)
     final_brier_scores.append(brier_score)
+
+print(final_brier_scores)
