@@ -79,6 +79,8 @@ elif "bpi" in argv[1]:
     dataset = "BPI12"
 elif "receipt" in argv[1]:
     dataset = "WABO receipt phase"
+elif "nasa" in argv[1]:
+    dataset = "NASA"
 else:
     dataset = argv[1]
 
